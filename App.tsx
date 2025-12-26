@@ -12,6 +12,9 @@ const App: React.FC = () => {
   const [selectedRaga, setSelectedRaga] = useState<Raga>(RAGAS[0]); // Default Mayamalavagowla
   const [volume, setVolume] = useState<number>(0.5);
 
+  // Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
   // Derived State
   const currentSwaras = selectedRaga.swaras;
 
@@ -24,6 +27,26 @@ const App: React.FC = () => {
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const [playbackIndex, setPlaybackIndex] = useState<number | null>(null);
   const sequenceScrollRef = useRef<HTMLDivElement>(null);
+
+  // --- Install Prompt Listener ---
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.then((choiceResult: any) => {
+      if (choiceResult.outcome === 'accepted') {
+        setInstallPrompt(null);
+      }
+    });
+  };
 
   // --- Common Helpers ---
 
@@ -243,9 +266,22 @@ const App: React.FC = () => {
         
         {/* Header & Tabs */}
         <div className="shrink-0 flex flex-col gap-3 pt-2">
-          <h1 className="text-xl font-bold text-center bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-            Sruthi Trainer
-          </h1>
+           <div className="flex items-center justify-center relative">
+             <h1 className="text-xl font-bold text-center bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                Sruthi Trainer
+             </h1>
+             {installPrompt && (
+               <button
+                 onClick={handleInstallClick}
+                 className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-indigo-400 hover:text-white bg-slate-800 hover:bg-indigo-600 rounded-full transition-all shadow-lg animate-pulse"
+                 title="Install App"
+               >
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                 </svg>
+               </button>
+             )}
+           </div>
           
           <div className="flex bg-slate-800 p-1 rounded-xl">
             <button

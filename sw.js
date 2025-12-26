@@ -4,6 +4,7 @@ const URLS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './icon.svg',
   './index.tsx',
   './App.tsx',
   './constants.ts',
