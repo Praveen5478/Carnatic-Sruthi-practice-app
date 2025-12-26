@@ -7,7 +7,7 @@ class AudioService {
   private pulseTimerId: number | null = null;
   private nextPulseStartTime: number = 0;
 
-  // Track currently playing nodes
+  // Track currently playing nodes for manual stop
   private currentNodes: {
     oscillators: OscillatorNode[];
     gain: GainNode;
@@ -31,6 +31,76 @@ class AudioService {
     }
   }
 
+  // Create the oscillator graph for a single note
+  private createVoice(frequency: number): { oscillators: OscillatorNode[], gain: GainNode } {
+    const ctx = this.audioContext!;
+    
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const osc3 = ctx.createOscillator();
+    const oscMixGain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    const noteGain = ctx.createGain();
+
+    // Fundamental
+    osc1.type = 'sawtooth';
+    osc1.frequency.value = frequency;
+    osc1.detune.value = 0;
+
+    // Unison
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = frequency;
+    osc2.detune.value = 0; 
+
+    // Square sub-harmonics/body
+    osc3.type = 'square';
+    osc3.frequency.value = frequency;
+    osc3.detune.value = 0; 
+
+    oscMixGain.gain.value = 0.2; 
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000; 
+    filter.Q.value = 0.5;
+
+    osc1.connect(oscMixGain);
+    osc2.connect(oscMixGain);
+    osc3.connect(oscMixGain);
+
+    oscMixGain.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(this.masterGainNode!);
+
+    return { oscillators: [osc1, osc2, osc3], gain: noteGain };
+  }
+
+  // Play a single note for a fixed duration (Sequence/Preview)
+  public async playOneShot(frequency: number, duration: number) {
+    this.initContext();
+    if (this.audioContext?.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    const ctx = this.audioContext!;
+    const now = ctx.currentTime;
+    const { oscillators, gain } = this.createVoice(frequency);
+
+    // Envelope
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(1.0, now + 0.05); // Attack
+    gain.gain.setValueAtTime(1.0, now + duration - 0.05); // Sustain
+    gain.gain.linearRampToValueAtTime(0, now + duration); // Release
+
+    oscillators.forEach(osc => osc.start(now));
+    oscillators.forEach(osc => osc.stop(now + duration + 0.1));
+
+    // Cleanup logic is handled by the graph disconnection naturally after stop
+    setTimeout(() => {
+      gain.disconnect();
+    }, (duration + 0.2) * 1000);
+  }
+
+  // Play a tone that loops or pulses indefinitely until stopTone is called
   public async playTone(frequency: number, pulseDuration: number) {
     this.initContext();
 
@@ -43,68 +113,18 @@ class AudioService {
     // Stop previous loop and nodes
     this.stopTone(true);
 
-    // Create Nodes for Sruthi Box Simulation
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const osc3 = ctx.createOscillator();
-    const oscMixGain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    const noteGain = ctx.createGain();
-
-    // 1. Oscillator Setup
-    // ZERO DETUNE to eliminate all pitch wobble/beating
-    
-    // Fundamental Sawtooth (Body)
-    osc1.type = 'sawtooth';
-    osc1.frequency.value = frequency;
-    osc1.detune.value = 0;
-
-    // Second Sawtooth (Richness without wobble - just unison stacking for volume density)
-    osc2.type = 'sawtooth';
-    osc2.frequency.value = frequency;
-    osc2.detune.value = 0; 
-
-    // Square (Woody character)
-    osc3.type = 'square';
-    osc3.frequency.value = frequency;
-    osc3.detune.value = 0; 
-
-    // 2. Mix
-    oscMixGain.gain.value = 0.2; 
-
-    // 3. Filter (Warm lowpass to simulate wooden box)
-    filter.type = 'lowpass';
-    filter.frequency.value = 2000; 
-    filter.Q.value = 0.5;
-
-    // Connections
-    osc1.connect(oscMixGain);
-    osc2.connect(oscMixGain);
-    osc3.connect(oscMixGain);
-
-    oscMixGain.connect(filter);
-    filter.connect(noteGain);
-    noteGain.connect(this.masterGainNode!);
-
-    // Start Oscillators
+    const { oscillators, gain } = this.createVoice(frequency);
     const now = ctx.currentTime;
-    osc1.start(now);
-    osc2.start(now);
-    osc3.start(now);
 
-    this.currentNodes = {
-      oscillators: [osc1, osc2, osc3],
-      gain: noteGain
-    };
+    oscillators.forEach(osc => osc.start(now));
+
+    this.currentNodes = { oscillators, gain };
 
     // Initialize Tone
     if (pulseDuration === 0) {
-      // Continuous Tone (Infinite)
-      // Smoothly fade in to full volume (1.0 relative to master)
-      noteGain.gain.setValueAtTime(0, now);
-      noteGain.gain.linearRampToValueAtTime(1.0, now + 0.1);
-      
-      // Do NOT schedule pulse loop
+      // Continuous Tone
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(1.0, now + 0.1);
     } else {
       // Pulsing Tone
       this.nextPulseStartTime = now;
@@ -118,34 +138,21 @@ class AudioService {
     const ctx = this.audioContext;
     const { gain } = this.currentNodes;
     
-    const gapDuration = 0.5; // Gap of silence
-    const fadeTime = 0.1;    // Short fade in
+    const gapDuration = 0.5; 
+    const fadeTime = 0.1;    
     
-    // Ensure we are scheduling in the future
     const startTime = Math.max(this.nextPulseStartTime, ctx.currentTime);
     const midTime = startTime + (activeDuration / 2);
     const endTime = startTime + activeDuration;
 
-    // Envelope Shape: 
-    // 0 -> 30% (Fast Attack) -> 100% (Slow Swell) -> 0% (Slow Decay)
-    
-    // 1. Start from Silence (Gap end)
     gain.gain.setValueAtTime(0, startTime);
-    
-    // 2. Fast ramp to 30% Base Volume (Entry)
     gain.gain.linearRampToValueAtTime(0.3, startTime + fadeTime);
-
-    // 3. Gradual Swell to 100% Peak (Midpoint)
     gain.gain.linearRampToValueAtTime(1.0, midTime);
-
-    // 4. Gradual Decay to 0% Silence (End)
     gain.gain.linearRampToValueAtTime(0.0, endTime);
 
-    // Schedule next loop
     const cycleDuration = activeDuration + gapDuration;
     this.nextPulseStartTime = startTime + cycleDuration;
     
-    // Calculate timeout delay
     const delay = (this.nextPulseStartTime - ctx.currentTime) * 1000 - 100;
     
     this.pulseTimerId = window.setTimeout(() => {
@@ -154,7 +161,6 @@ class AudioService {
   }
 
   public stopTone(immediate = false) {
-    // Clear the loop timer
     if (this.pulseTimerId) {
         window.clearTimeout(this.pulseTimerId);
         this.pulseTimerId = null;
@@ -166,15 +172,12 @@ class AudioService {
     const now = ctx.currentTime;
     const { gain, oscillators } = this.currentNodes;
 
-    // Cancel any future envelope ramps
     gain.gain.cancelScheduledValues(now);
     
-    // Smooth fade out
     gain.gain.setValueAtTime(gain.gain.value, now);
     const fadeDuration = immediate ? 0.05 : 0.2;
     gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
 
-    const nodesToStop = this.currentNodes;
     this.currentNodes = null;
 
     setTimeout(() => {

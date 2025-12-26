@@ -11,6 +11,11 @@ export interface Swara {
   shortLabel: string;
 }
 
+export interface Raga {
+  name: string;
+  swaras: Swara[];
+}
+
 export const PULSE_OPTIONS = [3, 5, 7, 0]; // Seconds, 0 represents Infinite
 
 // Frequencies based on A4 = 440Hz, calculating C3 to B3
@@ -31,14 +36,49 @@ export const SRUTHIS: Sruthi[] = [
   { kattai: "7", note: "B", frequency: 246.94 },
 ];
 
-// Shankarabharanam (Major Scale) intervals
-export const SWARAS: Swara[] = [
+// Helper to create swara array for a raga
+const createSwaras = (
+  r: {label: string, semi: number},
+  g: {label: string, semi: number},
+  m: {label: string, semi: number},
+  d: {label: string, semi: number},
+  n: {label: string, semi: number}
+): Swara[] => [
   { id: 'sa', label: 'Sa', shortLabel: 'S', semitones: 0 },
-  { id: 'ri', label: 'Ri', shortLabel: 'R2', semitones: 2 },
-  { id: 'ga', label: 'Ga', shortLabel: 'G3', semitones: 4 },
-  { id: 'ma', label: 'Ma', shortLabel: 'M1', semitones: 5 },
+  { id: 'ri', label: 'Ri', shortLabel: r.label, semitones: r.semi },
+  { id: 'ga', label: 'Ga', shortLabel: g.label, semitones: g.semi },
+  { id: 'ma', label: 'Ma', shortLabel: m.label, semitones: m.semi },
   { id: 'pa', label: 'Pa', shortLabel: 'P', semitones: 7 },
-  { id: 'da', label: 'Da', shortLabel: 'D2', semitones: 9 },
-  { id: 'ni', label: 'Ni', shortLabel: 'N3', semitones: 11 },
+  { id: 'da', label: 'Da', shortLabel: d.label, semitones: d.semi },
+  { id: 'ni', label: 'Ni', shortLabel: n.label, semitones: n.semi },
   { id: 'sa-high', label: 'Sȧ', shortLabel: 'Ṡ', semitones: 12 },
+];
+
+const R1 = { label: 'R1', semi: 1 };
+const R2 = { label: 'R2', semi: 2 };
+const G2 = { label: 'G2', semi: 3 };
+const G3 = { label: 'G3', semi: 4 };
+const M1 = { label: 'M1', semi: 5 };
+const M2 = { label: 'M2', semi: 6 };
+const D1 = { label: 'D1', semi: 8 };
+const D2 = { label: 'D2', semi: 9 };
+const N2 = { label: 'N2', semi: 10 };
+const N3 = { label: 'N3', semi: 11 };
+
+export const RAGAS: Raga[] = [
+  { name: "Mayamalavagowla", swaras: createSwaras(R1, G3, M1, D1, N3) }, // 15
+  { name: "Kalyani", swaras: createSwaras(R2, G3, M2, D2, N3) }, // 65
+  { name: "Shankarabharanam", swaras: createSwaras(R2, G3, M1, D2, N3) }, // 29
+  { name: "Kharaharapriya", swaras: createSwaras(R2, G2, M1, D2, N2) }, // 22
+  { name: "Hanumatodi", swaras: createSwaras(R1, G2, M1, D1, N2) }, // 8
+  { name: "Harikambhoji", swaras: createSwaras(R2, G3, M1, D2, N2) }, // 28
+  { name: "Natabhairavi", swaras: createSwaras(R2, G2, M1, D1, N2) }, // 20
+  { name: "Keeravani", swaras: createSwaras(R2, G2, M1, D1, N3) }, // 21
+  { name: "Shanmukhapriya", swaras: createSwaras(R2, G2, M2, D1, N2) }, // 56
+  { name: "Simhendramadhyamam", swaras: createSwaras(R2, G2, M2, D1, N3) }, // 57
+  { name: "Pantuvarali", swaras: createSwaras(R1, G3, M2, D1, N3) }, // 51
+  { name: "Charukesi", swaras: createSwaras(R2, G3, M1, D1, N2) }, // 26
+  { name: "Gowrimanohari", swaras: createSwaras(R2, G2, M1, D2, N3) }, // 23
+  { name: "Chakravakam", swaras: createSwaras(R1, G3, M1, D2, N2) }, // 16
+  { name: "Hemavathi", swaras: createSwaras(R2, G2, M2, D2, N2) }, // 58
 ];
