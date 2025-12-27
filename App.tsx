@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [sequence, setSequence] = useState<Swara[]>([]);
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const [playbackIndex, setPlaybackIndex] = useState<number | null>(null);
+  const [looperPulseDuration, setLooperPulseDuration] = useState<number>(1);
   const sequenceScrollRef = useRef<HTMLDivElement>(null);
 
   // --- Install Prompt Listener ---
@@ -109,6 +110,10 @@ const App: React.FC = () => {
 
   // --- Looper Logic ---
 
+  const handleLooperDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLooperPulseDuration(parseFloat(e.target.value));
+  };
+
   const addToSequence = (swara: Swara) => {
     setSequence(prev => [...prev, swara]);
     // Preview note short
@@ -157,8 +162,7 @@ const App: React.FC = () => {
       const playCurrent = (index: number) => {
         const swara = sequence[index];
         const freq = calculateFrequency(selectedSruthi.frequency, swara.semitones);
-        // Play for 1s (Pulse duration logic removed, fixed 1s)
-        audioService.playOneShot(freq, 1.0); 
+        audioService.playOneShot(freq, looperPulseDuration); 
       };
 
       // Initial play
@@ -174,13 +178,13 @@ const App: React.FC = () => {
           playCurrent(next);
           return next;
         });
-      }, 1000); // Fixed 1 second interval
+      }, looperPulseDuration * 1000);
     }
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [isLooping, sequence, selectedSruthi]); // Removed playbackIndex dependency to avoid re-creating interval on every tick
+  }, [isLooping, sequence, selectedSruthi, looperPulseDuration]);
 
   // Scroll to active note during playback
   useEffect(() => {
@@ -262,11 +266,11 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] bg-slate-900 text-slate-100 p-4 flex flex-col items-center overflow-hidden selection:bg-indigo-500 selection:text-white">
-      <div className="max-w-md w-full h-full flex flex-col gap-4">
+      <div className="max-w-md w-full h-full flex flex-col gap-5">
         
         {/* Header & Tabs */}
-        <div className="shrink-0 flex flex-col gap-3 pt-2">
-           <div className="flex items-center justify-center relative">
+        <div className="shrink-0 flex flex-col gap-1">
+           <div className="flex items-center justify-center relative min-h-[32px]">
              <h1 className="text-xl font-bold text-center bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
                 Sruthi Trainer
              </h1>
@@ -304,11 +308,14 @@ const App: React.FC = () => {
         </div>
 
         {/* Dynamic Controls Section */}
-        <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-xl backdrop-blur-sm flex-1 flex flex-col justify-evenly min-h-0 relative">
+        <div className={`
+          bg-slate-800/40 p-4 rounded-3xl border border-slate-700 shadow-xl backdrop-blur-sm flex flex-col relative overflow-hidden
+          ${activeTab === 'looper' ? 'flex-1 min-h-0' : 'shrink-0'}
+        `}>
           
           {/* TRAINER CONTROLS */}
           {activeTab === 'trainer' && (
-            <>
+            <div className="flex flex-col gap-5">
               {/* Controls Row: Sruthi & Raga */}
               <div className="flex gap-3">
                 {/* Sruthi Selector (Left) */}
@@ -384,13 +391,13 @@ const App: React.FC = () => {
               >
                 Stop Sound
               </button>
-            </>
+            </div>
           )}
 
           {/* LOOPER CONTROLS */}
           {activeTab === 'looper' && (
-            <>
-               <div className="flex justify-between items-end mb-2">
+            <div className="h-full flex flex-col gap-6">
+               <div className="flex justify-between items-end">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Sequence ({sequence.length})</span>
                   <div className="flex gap-2 w-2/3 justify-end">
                     {/* Compact Raga Select */}
@@ -423,10 +430,10 @@ const App: React.FC = () => {
                   </div>
                </div>
 
-               {/* Sequence Display */}
+               {/* Sequence Display - Flexible Height */}
                <div 
                  ref={sequenceScrollRef}
-                 className="relative h-48 bg-slate-900 rounded-xl border border-slate-700 p-3 flex flex-wrap content-start gap-2 overflow-y-auto mb-4 scrollbar-thin scrollbar-thumb-slate-700"
+                 className="relative flex-1 bg-slate-900 rounded-xl border border-slate-700 p-3 flex flex-wrap content-start gap-2 overflow-y-auto min-h-[80px] scrollbar-thin scrollbar-thumb-slate-700"
                >
                  {sequence.length === 0 ? (
                    <span className="w-full text-center text-xs text-slate-600 italic mt-10">Tap keys below to add notes</span>
@@ -447,7 +454,7 @@ const App: React.FC = () => {
                </div>
 
                {/* Edit Controls */}
-               <div className="grid grid-cols-2 gap-3 mb-4">
+               <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={removeFromSequence}
                     disabled={sequence.length === 0}
@@ -465,12 +472,46 @@ const App: React.FC = () => {
                   </button>
                </div>
 
+               {/* Speed Control */}
+               <label className="flex flex-col gap-2">
+                 <div className="flex justify-between items-center ml-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Loop Speed</span>
+                    <span className="text-[10px] font-mono text-slate-500">{looperPulseDuration}s</span>
+                 </div>
+                 <input 
+                      type="range" 
+                      min="1" 
+                      max="3" 
+                      step="0.1" 
+                      value={looperPulseDuration} 
+                      onChange={handleLooperDurationChange} 
+                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+               </label>
+
+               {/* Volume Control */}
+               <label className="flex flex-col gap-2">
+                 <div className="flex justify-between items-center ml-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Master Volume</span>
+                    <span className="text-[10px] font-mono text-slate-500">{Math.round(volume * 100)}%</span>
+                 </div>
+                 <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.01" 
+                      value={volume} 
+                      onChange={handleVolumeChange} 
+                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+               </label>
+
                {/* Play/Stop Loop */}
                <button
                  onClick={toggleLoop}
                  disabled={sequence.length === 0}
                  className={`
-                    w-full py-4 rounded-xl font-bold text-sm uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2
+                    mt-auto w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2
                     ${isLooping 
                       ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20 animate-pulse' 
                       : sequence.length > 0 ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}
@@ -488,74 +529,22 @@ const App: React.FC = () => {
                    </>
                  )}
                </button>
-               
-               {/* Volume (Compact) */}
-               <div className="mt-4 flex items-center gap-3">
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Vol</span>
-                  <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolumeChange} className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"/>
-               </div>
-            </>
+            </div>
           )}
-
+        </div>
+        
+        {/* Swara Keys Grid */}
+        <div className="grid grid-cols-3 gap-2 shrink-0 pb-2">
+            {currentSwaras.map((swara) => (
+                <SwaraButton
+                key={swara.id}
+                swara={swara}
+                isActive={isSwaraActive(swara)}
+                onClick={handleSwaraClick}
+                />
+            ))}
         </div>
 
-        {/* Keyboard Interface - Compact 3 Row Layout */}
-        <div className="shrink-0 flex flex-col gap-3 pb-2">
-           {/* Row 1: Sa, Ri, Ga */}
-           <div className="grid grid-cols-3 gap-3">
-             {currentSwaras.slice(0, 3).map((swara) => (
-               <SwaraButton
-                 key={swara.id}
-                 swara={swara}
-                 isActive={isSwaraActive(swara)}
-                 onClick={handleSwaraClick}
-               />
-             ))}
-           </div>
-
-           {/* Row 2: Ma, Pa, Da */}
-           <div className="grid grid-cols-3 gap-3">
-             {currentSwaras.slice(3, 6).map((swara) => (
-               <SwaraButton
-                 key={swara.id}
-                 swara={swara}
-                 isActive={isSwaraActive(swara)}
-                 onClick={handleSwaraClick}
-               />
-             ))}
-           </div>
-
-           {/* Row 3: Ni, High Sa (Centered) */}
-           <div className="grid grid-cols-3 gap-3">
-             <div className="col-start-1">
-                <SwaraButton
-                  swara={currentSwaras[6]} // Ni
-                  isActive={isSwaraActive(currentSwaras[6])}
-                  onClick={handleSwaraClick}
-                />
-             </div>
-             <div className="col-start-2">
-                <SwaraButton
-                  swara={currentSwaras[7]} // High Sa
-                  isActive={isSwaraActive(currentSwaras[7])}
-                  onClick={handleSwaraClick}
-                />
-             </div>
-             {/* Empty 3rd col - Frequency Display */}
-             <div className="col-start-3 flex flex-col justify-center items-center text-[10px] text-slate-600 font-mono opacity-50">
-               {((activeTab === 'trainer' && activeSwaraId) || (activeTab === 'looper' && playbackIndex !== null && sequence[playbackIndex]))
-                  ? calculateFrequency(
-                      selectedSruthi.frequency, 
-                      // If it's the active swara, use its current semitones. If it's a sequence note, use the stored semitones.
-                      activeTab === 'trainer' && activeSwaraId 
-                        ? (currentSwaras.find(s => s.id === activeSwaraId)?.semitones || 0)
-                        : (sequence[playbackIndex!]?.semitones || 0)
-                    ).toFixed(1) + ' Hz'
-                  : ''
-               }
-             </div>
-           </div>
-        </div>
       </div>
     </div>
   );
